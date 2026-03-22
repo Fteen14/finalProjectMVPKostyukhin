@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Вход — Password Manager</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="auth-body">
+  <div class="auth-wrapper">
+    <div class="glass-card auth-card">
+      <div class="brand">🔐 Password Manager</div>
+      <h1>Вход в систему</h1>
+      <p class="muted">Введите учётные данные для доступа к приложению.</p>
+
+      {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" class="auth-form">
+        <label>Логин</label>
+        <input type="text" name="username" placeholder="Введите логин" required>
+
+        <label>Пароль</label>
+        <input type="password" name="password" placeholder="Введите пароль" required>
+
+        <button type="submit" class="btn btn-primary">Войти</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

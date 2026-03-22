@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Password Manager</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>
+    function togglePassword(id) {
+      const hidden = document.getElementById('hidden-' + id);
+      const plain = document.getElementById('plain-' + id);
+
+      if (plain.style.display === 'none') {
+        plain.style.display = 'inline';
+        hidden.style.display = 'none';
+      } else {
+        plain.style.display = 'none';
+        hidden.style.display = 'inline';
+      }
+    }
+
+    function toggleMode() {
+      const mode = document.getElementById('mode-select').value;
+      const gen = document.getElementById('generate-fields');
+      const man = document.getElementById('manual-fields');
+
+      if (mode === 'manual') {
+        gen.style.display = 'none';
+        man.style.display = 'block';
+      } else {
+        gen.style.display = 'block';
+        man.style.display = 'none';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', function () {
+      toggleMode();
+    });
+  </script>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar glass-card">
+      <div>
+        <div class="brand">🔐 Password Manager</div>
+        <div class="muted">Генерация, проверка и хранение паролей</div>
+      </div>
+      <a class="btn btn-secondary" href="{{ url_for('logout') }}">Выйти</a>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="alerts">
+          {% for category, message in messages %}
+            <div class="alert {% if category == 'error' %}alert-error{% else %}alert-success{% endif %}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="grid">
+      <section class="glass-card">
+        <h2>Добавить запись</h2>
+        <form method="POST" class="form-grid">
+          <input type="hidden" name="action" value="save_entry">
+
+          <label>Название записи</label>
+          <input type="text" name="name" placeholder="Например: GitHub" required>
+
+          <label>Режим</label>
+          <select name="mode" id="mode-select" onchange="toggleMode()">
+            <option value="generate">Сгенерировать пароль</option>
+            <option value="manual">Ввести свой пароль</option>
+          </select>
+
+          <div id="generate-fields">
+            <label>Длина</label>
+            <input type="number" name="length" min="4" value="12">
+
+            <label>Срок действия (дни)</label>
+            <input type="number" name="days" min="1" value="30">
+
+            <label class="checkbox"><input type="checkbox" name="lower" checked> Строчные буквы</label>
+            <label class="checkbox"><input type="checkbox" name="upper" checked> Заглавные буквы</label>
+            <label class="checkbox"><input type="checkbox" name="digits" checked> Цифры</label>
+            <label class="checkbox"><input type="checkbox" name="symbols" checked> Спецсимволы</label>
+          </div>
+
+          <div id="manual-fields" style="display:none;">
+            <label>Ваш пароль</label>
+            <input type="text" name="manual_password" placeholder="Введите свой пароль">
+
+            <label>Срок действия (дни)</label>
+            <input type="number" name="manual_days" min="1" value="30">
+          </div>
+
+          <button type="submit" class="btn btn-primary full">Сохранить</button>
+        </form>
+
+        {% if generated_password %}
+          <div class="result-box">
+            <div><strong>Пароль:</strong></div>
+            <div class="password-box">{{ generated_password }}</div>
+
+            <div class="score-row">
+              <span>Надёжность: {{ generated_score }}/10 — {{ generated_label }}</span>
+            </div>
+            <div class="progress">
+              <div class="progress-fill" style="width: {{ generated_score * 10 }}%; background: {{ generated_color }};"></div>
+            </div>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="glass-card">
+        <h2>Проверить свой пароль</h2>
+        <form method="POST" class="form-grid">
+          <input type="hidden" name="action" value="check">
+
+          <label>Пароль</label>
+          <input type="text" name="user_password" placeholder="Введите пароль для проверки" value="{{ check_password_value }}">
+
+          <button type="submit" class="btn btn-primary full">Проверить</button>
+        </form>
+
+        {% if checked_score is not none %}
+          <div class="result-box">
+            <div><strong>Оценка:</strong> {{ checked_score }}/10 — {{ checked_label }}</div>
+            <div class="progress">
+              <div class="progress-fill" style="width: {{ checked_score * 10 }}%; background: {{ checked_color }};"></div>
+            </div>
+          </div>
+        {% endif %}
+      </section>
+    </div>
+
+    <section class="glass-card" style="margin-bottom: 20px;">
+      <h2>AI-анализ пароля</h2>
+
+      <form method="POST" class="form-grid">
+        <input type="hidden" name="action" value="analyze_ai">
+
+        <label>Пароль для AI-анализа</label>
+        <input type="text" name="ai_password" placeholder="Введите пароль" value="{{ ai_input_password }}">
+
+        <button type="submit" class="btn btn-primary full">Проанализировать с ИИ</button>
+      </form>
+
+      <form method="POST" class="form-grid" style="margin-top: 12px;">
+        <input type="hidden" name="action" value="improve_ai">
+        <input type="text" name="ai_password" placeholder="Введите пароль" value="{{ ai_input_password }}">
+        <button type="submit" class="btn btn-secondary full">Улучшить пароль с ИИ</button>
+      </form>
+
+      {% if ai_local_result %}
+        <div class="result-box">
+          <div><strong>Локальная оценка:</strong></div>
+          <div>Уровень: {{ ai_local_result.strength }}</div>
+          <div>Баллы: {{ ai_local_result.score }}/10</div>
+
+          {% if ai_local_result.advice %}
+            <div style="margin-top: 8px;"><strong>Рекомендации:</strong></div>
+            <ul>
+              {% for item in ai_local_result.advice %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% if ai_result %}
+        <div class="result-box">
+          <div><strong>Ответ YandexGPT:</strong></div>
+          <pre style="white-space: pre-wrap; font-family: inherit;">{{ ai_result }}</pre>
+        </div>
+      {% endif %}
+
+      {% if improved_password %}
+        <div class="result-box">
+          <div><strong>Улучшенный пароль от ИИ:</strong></div>
+          <div class="password-box">{{ improved_password }}</div>
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="glass-card">
+      <div class="list-header">
+        <h2>Сохранённые записи</h2>
+
+        <form method="GET" class="search-form">
+          <input type="text" name="search" placeholder="Поиск по названию" value="{{ search }}">
+          <button type="submit" class="btn btn-secondary">Найти</button>
+        </form>
+      </div>
+
+      {% if passwords %}
+        <div class="password-list">
+          {% for item in passwords %}
+            <div class="password-item">
+              <div class="password-main">
+                <div class="password-title">{{ item.name }}</div>
+                <div class="meta">
+                  <span>Срок: {{ item.expire }}</span>
+                  <span class="{% if item.expired %}status-expired{% else %}status-ok{% endif %}">
+                    {{ item.status }}
+                  </span>
+                </div>
+                <div class="password-line">
+                  <span id="hidden-{{ item.id }}">**************</span>
+                  <span id="plain-{{ item.id }}" style="display:none;">{{ item.password_plain }}</span>
+                </div>
+              </div>
+
+              <div class="actions">
+                <button type="button" class="btn btn-secondary" onclick="togglePassword('{{ item.id }}')">Показать</button>
+
+                <form method="POST" action="{{ url_for('delete_entry', entry_id=item.id) }}">
+                  <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">Записей пока нет.</div>
+      {% endif %}
+    </section>
+  </div>
+</body>
+</html>
